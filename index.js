@@ -1,12 +1,12 @@
-const {
-    Client,
-    GatewayIntentBits,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ChannelType,
-    PermissionsBitField,
-    AttachmentBuilder
+const { 
+  Client, 
+  GatewayIntentBits,
+  ChannelType,
+  PermissionsBitField,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder
 } = require('discord.js');
 
 
@@ -104,38 +104,104 @@ client.on("messageCreate", async (message) => {
     }
 });
 // ================= BOTONES =================
-client.on("interactionCreate", async (interaction) => {
+cclient.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
     const guild = interaction.guild;
     const user = interaction.user;
 
-    const channel = await guild.channels.create({
-        name: `ticket-${user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-            {
-                id: guild.roles.everyone,
-                deny: [PermissionsBitField.Flags.ViewChannel]
-            },
-            {
-                id: user.id,
-                allow: [
-                    PermissionsBitField.Flags.ViewChannel,
-                    PermissionsBitField.Flags.SendMessages
-                ]
-            },
-            {
-                id: "1475646230259306516",
-                allow: [PermissionsBitField.Flags.ViewChannel]
-            },
-            {
-                id: "1475652367012597831",
-                allow: [PermissionsBitField.Flags.ViewChannel]
-            }
-        ]
-    });
+    const CATEGORIA_ID = "1475645842580050040";
+    const ROL_SOPORTE_1 = "1475646230259306516";
+    const ROL_SOPORTE_2 = "1475652367012597831";
 
+    // ================= CREAR TICKET =================
+    if (["consultas", "postularse", "ausencias"].includes(interaction.customId)) {
+
+        const channel = await guild.channels.create({
+            name: `ticket-${user.username}`,
+            type: ChannelType.GuildText,
+            parent: CATEGORIA_ID,
+            permissionOverwrites: [
+                {
+                    id: guild.roles.everyone,
+                    deny: [PermissionsBitField.Flags.ViewChannel]
+                },
+                {
+                    id: user.id,
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.SendMessages
+                    ]
+                },
+                {
+                    id: ROL_SOPORTE_1,
+                    allow: [PermissionsBitField.Flags.ViewChannel]
+                },
+                {
+                    id: ROL_SOPORTE_2,
+                    allow: [PermissionsBitField.Flags.ViewChannel]
+                }
+            ]
+        });
+
+        const botonesTicket = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("reclamar_ticket")
+                .setLabel("Reclamar Ticket")
+                .setStyle(ButtonStyle.Primary),
+
+            new ButtonBuilder()
+                .setCustomId("cerrar_ticket")
+                .setLabel("Cerrar Ticket")
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        await interaction.reply({
+            content: `✅ Ticket creado: ${channel}`,
+            ephemeral: true
+        });
+
+        await channel.send({
+            content: `📌 Ticket abierto por ${user}\n<@&${ROL_SOPORTE_1}> <@&${ROL_SOPORTE_2}>`,
+            components: [botonesTicket]
+        });
+
+        return;
+    }
+
+    // ================= RECLAMAR =================
+    if (interaction.customId === "reclamar_ticket") {
+
+        if (!interaction.member.roles.cache.has(ROL_SOPORTE_1) &&
+            !interaction.member.roles.cache.has(ROL_SOPORTE_2)) {
+
+            return interaction.reply({
+                content: "❌ No tienes permiso.",
+                ephemeral: true
+            });
+        }
+
+        await interaction.reply({
+            content: `📌 ${interaction.user} ha reclamado este ticket.`
+        });
+
+        return;
+    }
+
+    // ================= CERRAR =================
+    if (interaction.customId === "cerrar_ticket") {
+
+        await interaction.reply({
+            content: "🔒 Cerrando ticket en 5 segundos..."
+        });
+
+        setTimeout(() => {
+            interaction.channel.delete();
+        }, 5000);
+
+        return;
+    }
+});
     await interaction.reply({
         content: `✅ Ticket creado: ${channel}`,
         ephemeral: true
@@ -173,6 +239,6 @@ client.on("interactionCreate", async (interaction) => {
             `Hola ${user}, explica tu consulta y el equipo te responderá.`
         );
     }
-});
+;
 
 client.login(process.env.TOKEN);
