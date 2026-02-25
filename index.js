@@ -14,8 +14,6 @@ const {
 
 const path = require('path');
 
-const TOKEN = "MTQ3NTY0MzI1MTY1MzQ3NjU1Mw.G4qYpg.xcFbS0XOEmDEdqMhJnZFJ3J6hLLRULBTzYIIgs";
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -177,4 +175,4 @@ client.on("interactionCreate", async (interaction) => {
     }
 });
 
-client.login(TOKEN);
+client.login(process.env.TOKEN);
