@@ -203,6 +203,18 @@ if (fs.existsSync(dataPath)) {
   warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
 }
 
+client.once("ready", () => {
+  console.log(`Bot listo como ${client.user.tag}`);
+
+  client.user.setPresence({
+    activities: [{
+      name: "Sistema de Warns | !warn",
+      type: ActivityType.Watching
+    }],
+    status: "online"
+  });
+});
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(PREFIX)) return;
@@ -218,7 +230,9 @@ client.on("messageCreate", async (message) => {
     const user = message.mentions.users.first();
     if (!user) return message.reply("Mencioná a un usuario.");
 
-    const reason = args.slice(1).join(" ") || "Sin motivo";
+    args.shift(); // elimina la mención de los argumentos
+    const reason = args.join(" ") || "Sin motivo";
+
     const guildId = message.guild.id;
 
     if (!warnings[guildId]) warnings[guildId] = {};
@@ -239,6 +253,5 @@ client.on("messageCreate", async (message) => {
     }
   }
 });
-
 
 client.login(process.env.TOKEN);
