@@ -195,4 +195,50 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
+const PREFIX = "!";
+const dataPath = path.join(__dirname, "warnings.json");
+
+let warnings = {};
+if (fs.existsSync(dataPath)) {
+  warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+}
+
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (!message.content.startsWith(PREFIX)) return;
+
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
+
+  if (command === "warn") {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+      return message.reply("No tenés permisos para usar este comando.");
+    }
+
+    const user = message.mentions.users.first();
+    if (!user) return message.reply("Mencioná a un usuario.");
+
+    const reason = args.slice(1).join(" ") || "Sin motivo";
+    const guildId = message.guild.id;
+
+    if (!warnings[guildId]) warnings[guildId] = {};
+    if (!warnings[guildId][user.id]) warnings[guildId][user.id] = 0;
+
+    warnings[guildId][user.id] += 1;
+
+    fs.writeFileSync(dataPath, JSON.stringify(warnings, null, 2));
+
+    const warnCount = warnings[guildId][user.id];
+
+    await message.delete().catch(() => {});
+
+    message.channel.send(`⚠️ WARN ${user} ${reason} ${warnCount}/3`);
+
+    if (warnCount >= 3) {
+      message.channel.send(`🚨 ${user} alcanzó 3/3 warns.`);
+    }
+  }
+});
+
+
 client.login(process.env.TOKEN);
