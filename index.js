@@ -1,4 +1,4 @@
-const {
+const { 
   Client,
   GatewayIntentBits,
   ChannelType,
@@ -7,10 +7,15 @@ const {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  AttachmentBuilder
+  AttachmentBuilder,
+  ActivityType
 } = require("discord.js");
 
+const fs = require("fs");
 const path = require("path");
+
+const PREFIX = "!";
+const dataPath = path.join(__dirname, "warnings.json");
 
 const client = new Client({
   intents: [
@@ -20,11 +25,33 @@ const client = new Client({
   ]
 });
 
+
+// ================== SISTEMA DE WARNS ==================
+
+let warnings = {};
+
+if (fs.existsSync(dataPath)) {
+  warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+}
+
+
+// ================== READY ==================
+
 client.once("ready", () => {
   console.log(`✅ Bot listo como ${client.user.tag}`);
+
+  client.user.setPresence({
+    activities: [{
+      name: "Benny's Custom | !panel",
+      type: ActivityType.Playing
+    }],
+    status: "online"
+  });
 });
 
-// ================= COMANDOS =================
+
+// ================== COMANDOS ==================
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
@@ -34,21 +61,16 @@ client.on("messageCreate", async (message) => {
     const normas = `
 NORMAS 📋
 
-1.1 Está completamente prohibido realizar actos ilegales en servicio.
-1.2 Es obligatorio tener licencia de conducir.
-1.3 Al estar en servicio siempre se debe llevar el uniforme.
-1.4 Se prohíbe el uso del equipo para uso personal.
-1.5 Está prohibido utilizar el vehículo personal para trabajar.
-1.6 Está prohibido dejar abandonados los vehículos de trabajo.
-1.7 Al entrar en servicio es obligatorio estar en radio y Discord.
-1.8 /rp ENTRA EN SERVICIO.
-1.9 /rp MECÁNICO EN CAMINO AL LLAMADO (#) A (#) KM
-1.10 /rp INFORMAMOS QUE POR FALTA DE PERSONAL...
-1.11 /rp EN CAMINO AL LLAMADO POLICIAL A (#) KM. ¿SERÍA SEGURA LA ZONA?
-1.12 Trato respetuoso obligatorio.
+1.1 Prohibido actos ilegales en servicio.
+1.2 Obligatorio licencia de conducir.
+1.3 Siempre uniforme en servicio.
+1.4 Prohibido uso personal del equipo.
+1.5 Prohibido vehículo personal para trabajar.
+1.6 No abandonar vehículos.
+1.7 Obligatorio radio y Discord.
+1.12 Trato respetuoso.
 1.13 Prohibido tuneo gratuito.
 1.14 Full tuning a precio de lista.
-1.15 No se puede robar material de trabajo.
     `;
 
     const gifPath = path.join(__dirname, "tugif.gif");
@@ -62,16 +84,13 @@ NORMAS 📋
     await message.channel.send({ files: [attachment] });
   }
 
+
   // ================= PANEL =================
   if (message.content === "!panel") {
 
     const embed = new EmbedBuilder()
       .setColor("#2b2d31")
-      .setAuthor({
-        name: message.author.username,
-        iconURL: message.author.displayAvatarURL({ dynamic: true })
-      })
-      .setTitle("Ticket Benny's")
+      .setTitle("🎟 Ticket Benny's")
       .setDescription("Selecciona una categoría para crear ticket");
 
     const row = new ActionRowBuilder().addComponents(
@@ -99,9 +118,50 @@ NORMAS 📋
       components: [row]
     });
   }
+
+
+  // ================= WARN =================
+  if (!message.content.startsWith(PREFIX)) return;
+
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
+
+  if (command === "warn") {
+
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+      return message.reply("❌ No tenés permisos.");
+    }
+
+    const user = message.mentions.users.first();
+    if (!user) return message.reply("⚠️ Mencioná a un usuario.");
+
+    args.shift();
+    const reason = args.join(" ") || "Sin motivo";
+
+    const guildId = message.guild.id;
+
+    if (!warnings[guildId]) warnings[guildId] = {};
+    if (!warnings[guildId][user.id]) warnings[guildId][user.id] = 0;
+
+    warnings[guildId][user.id] += 1;
+
+    fs.writeFileSync(dataPath, JSON.stringify(warnings, null, 2));
+
+    const warnCount = warnings[guildId][user.id];
+
+    await message.delete().catch(() => {});
+
+    message.channel.send(`⚠️ WARN ${user} | ${reason} (${warnCount}/3)`);
+
+    if (warnCount >= 3) {
+      message.channel.send(`🚨 ${user} alcanzó 3/3 warns.`);
+    }
+  }
 });
 
+
 // ================= BOTONES =================
+
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
@@ -112,7 +172,8 @@ client.on("interactionCreate", async (interaction) => {
   const ROL_SOPORTE_1 = "1475646230259306516";
   const ROL_SOPORTE_2 = "1475652367012597831";
 
-  // ================= CREAR TICKET =================
+
+  // ===== CREAR TICKET =====
   if (["consultas", "postularse", "ausencias"].includes(interaction.customId)) {
 
     const channel = await guild.channels.create({
@@ -165,7 +226,8 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 
-  // ================= RECLAMAR =================
+
+  // ===== RECLAMAR =====
   if (interaction.customId === "reclamar_ticket") {
 
     if (!interaction.member.roles.cache.has(ROL_SOPORTE_1) &&
@@ -182,7 +244,8 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 
-  // ================= CERRAR =================
+
+  // ===== CERRAR =====
   if (interaction.customId === "cerrar_ticket") {
 
     await interaction.reply({
@@ -193,65 +256,7 @@ client.on("interactionCreate", async (interaction) => {
       interaction.channel.delete().catch(() => {});
     }, 5000);
   }
-});
 
-const PREFIX = "!";
-const dataPath = path.join(__dirname, "warnings.json");
-
-let warnings = {};
-if (fs.existsSync(dataPath)) {
-  warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
-}
-
-client.once("ready", () => {
-  console.log(`Bot listo como ${client.user.tag}`);
-
-  client.user.setPresence({
-    activities: [{
-      name: "Sistema de Warns | !warn",
-      type: ActivityType.Watching
-    }],
-    status: "online"
-  });
-});
-
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.content.startsWith(PREFIX)) return;
-
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  if (command === "warn") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-      return message.reply("No tenés permisos para usar este comando.");
-    }
-
-    const user = message.mentions.users.first();
-    if (!user) return message.reply("Mencioná a un usuario.");
-
-    args.shift(); // elimina la mención de los argumentos
-    const reason = args.join(" ") || "Sin motivo";
-
-    const guildId = message.guild.id;
-
-    if (!warnings[guildId]) warnings[guildId] = {};
-    if (!warnings[guildId][user.id]) warnings[guildId][user.id] = 0;
-
-    warnings[guildId][user.id] += 1;
-
-    fs.writeFileSync(dataPath, JSON.stringify(warnings, null, 2));
-
-    const warnCount = warnings[guildId][user.id];
-
-    await message.delete().catch(() => {});
-
-    message.channel.send(`⚠️ WARN ${user} ${reason} ${warnCount}/3`);
-
-    if (warnCount >= 3) {
-      message.channel.send(`🚨 ${user} alcanzó 3/3 warns.`);
-    }
-  }
 });
 
 client.login(process.env.TOKEN);
