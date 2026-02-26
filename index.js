@@ -1,4 +1,4 @@
-const { 
+const {
   Client,
   GatewayIntentBits,
   ChannelType,
@@ -17,6 +17,11 @@ const path = require("path");
 const PREFIX = "!";
 const dataPath = path.join(__dirname, "warnings.json");
 
+if (!process.env.TOKEN) {
+  console.error("❌ TOKEN no definido en variables de entorno.");
+  process.exit(1);
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -25,15 +30,18 @@ const client = new Client({
   ]
 });
 
-
 // ================== SISTEMA DE WARNS ==================
 
 let warnings = {};
 
-if (fs.existsSync(dataPath)) {
-  warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+try {
+  if (fs.existsSync(dataPath)) {
+    warnings = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+  }
+} catch (err) {
+  console.error("⚠️ Error leyendo warnings.json, se reinicia archivo.");
+  warnings = {};
 }
-
 
 // ================== READY ==================
 
@@ -49,10 +57,10 @@ client.once("ready", () => {
   });
 });
 
-
 // ================== COMANDOS ==================
 
 client.on("messageCreate", async (message) => {
+  if (!message.guild) return;
   if (message.author.bot) return;
 
   // ================= NORMAS =================
@@ -73,17 +81,18 @@ NORMAS 📋
 1.14 Full tuning a precio de lista.
     `;
 
-    const gifPath = path.join(__dirname, "tugif.gif");
-    const attachment = new AttachmentBuilder(gifPath);
-
     await message.channel.send({
       content: "@everyone\n```" + normas + "```",
       allowedMentions: { parse: ["everyone"] }
     });
 
-    await message.channel.send({ files: [attachment] });
-  }
+    const gifPath = path.join(__dirname, "tugif.gif");
 
+    if (fs.existsSync(gifPath)) {
+      const attachment = new AttachmentBuilder(gifPath);
+      await message.channel.send({ files: [attachment] });
+    }
+  }
 
   // ================= PANEL =================
   if (message.content === "!panel") {
@@ -119,12 +128,11 @@ NORMAS 📋
     });
   }
 
-
   // ================= WARN =================
   if (!message.content.startsWith(PREFIX)) return;
 
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
+  const command = args.shift()?.toLowerCase();
 
   if (command === "warn") {
 
@@ -135,8 +143,7 @@ NORMAS 📋
     const user = message.mentions.users.first();
     if (!user) return message.reply("⚠️ Mencioná a un usuario.");
 
-    args.shift();
-    const reason = args.join(" ") || "Sin motivo";
+    const reason = args.slice(1).join(" ") || "Sin motivo";
 
     const guildId = message.guild.id;
 
@@ -159,7 +166,6 @@ NORMAS 📋
   }
 });
 
-
 // ================= BOTONES =================
 
 client.on("interactionCreate", async (interaction) => {
@@ -172,9 +178,29 @@ client.on("interactionCreate", async (interaction) => {
   const ROL_SOPORTE_1 = "1475646230259306516";
   const ROL_SOPORTE_2 = "1475652367012597831";
 
+  if (!guild) return;
 
   // ===== CREAR TICKET =====
   if (["consultas", "postularse", "ausencias"].includes(interaction.customId)) {
+
+    const existingChannel = guild.channels.cache.find(
+      c => c.name === `ticket-${user.username}`
+    );
+
+    if (existingChannel) {
+      return interaction.reply({
+        content: `⚠️ Ya tienes un ticket abierto: ${existingChannel}`,
+        ephemeral: true
+      });
+    }
+
+    const category = guild.channels.cache.get(CATEGORIA_ID);
+    if (!category) {
+      return interaction.reply({
+        content: "❌ Categoría no encontrada.",
+        ephemeral: true
+      });
+    }
 
     const channel = await guild.channels.create({
       name: `ticket-${user.username}`,
@@ -226,7 +252,6 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 
-
   // ===== RECLAMAR =====
   if (interaction.customId === "reclamar_ticket") {
 
@@ -244,7 +269,6 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 
-
   // ===== CERRAR =====
   if (interaction.customId === "cerrar_ticket") {
 
@@ -256,7 +280,6 @@ client.on("interactionCreate", async (interaction) => {
       interaction.channel.delete().catch(() => {});
     }, 5000);
   }
-
 });
 
 client.login(process.env.TOKEN);
